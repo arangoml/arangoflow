@@ -1,0 +1,7 @@
+STATUS_PENDING = "pending"
+STATUS_WORKING = "working"
+STATUS_DONE = "done"
+STATUS_ERROR = "error"
+
+LEVEL_NOT_CRITICAL = 0
+LEVEL_CRITICAL = 1
