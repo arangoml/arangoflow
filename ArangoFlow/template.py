@@ -13,7 +13,7 @@ class FlowProject(object):
     def __init__(self, database, project_name):
         super(FlowProject, self).__init__()
        
-        self.status = consts.STATUS_PENDING
+        self.status = consts["STATUS"]["PENDING"]
         
         self.database = database
         
@@ -37,8 +37,8 @@ class FlowProject(object):
 
     def notify_error(self, process) :
         """notify the project that a process has ended with a error. If the process as critical it ends the run"""
-        if process.level == consts.LEVEL_CRITICAL :
-            self.update_status(consts.STATUS_ERROR) 
+        if process.rank == consts.RANKS["CRITICAL"] :
+            self.update_status(consts["STATUS"]["ERROR"]) 
             raise exceptions.CriticalFailure("Process: %s, _id : %s, ended with an error" % (process.name, process.arango_doc._id))
 
     def _db_setup(self):
@@ -86,22 +86,21 @@ class FlowProject(object):
                 self.database.graphs["ArangoFlow_graph"].link("Pipes", start_node.arango_doc, desc.arango_doc, {})
                 self._build_traverse(desc)
 
-    def _run(self) :
-        """private run function. launches the run for every input"""
-        for inp in self.inputs :
-            inp._run()
-
     def run(self):
         """build the pipelne graph and runs it"""
         import time
 
+        self.update_status(consts["STATUS"]["RUNNING"]) 
+        
         print("building symbolic graph in arangodb...")
         self._build_traverse()
         print("done")
         
         print("runing the pipeline...")
-        self._run()
+        for inp in self.inputs :
+            inp._run()
         self.arango_doc["end_date"] = time.time()
+        self.update_status(consts["STATUS"]["DONE"]) 
         self.arango_doc.patch()
         print("done")
 
@@ -160,12 +159,12 @@ class Process(object):
         obj.ancestors = ancestors
         return obj
 
-    def __init__(self, project, level = consts.LEVEL_CRITICAL, **kwargs):
-        """The first argument must allways be the project. A precess with critical level will end the run. A process with no critical level should only end its branch (not implemented, see: recieve_ancestor_join) """
+    def __init__(self, project, rank = consts.RANKS["CRITICAL"], **kwargs):
+        """The first argument must allways be the project. A precess with critical rank will end the run. A process with no critical rank should only end its branch (not implemented, see: recieve_ancestor_join) """
         super(Process, self).__init__()
         
-        self.level = consts.LEVEL_CRITICAL
-        self.status = consts.STATUS_PENDING
+        self.rank = consts.RANKS["CRITICAL"]
+        self.status = consts["STATUS"]["PENDING"]
         
         self.project = project
 
@@ -180,9 +179,9 @@ class Process(object):
         
         self.project.register_process(self)
     
-    def update_critical_level(self, level) :
-        """Update the level of impotance of the process"""
-        self.level = level
+    def update_critical_rank(self, rank) :
+        """Update the rank of impotance of the process"""
+        self.rank = rank
 
     def _db_create(self) :
         """create the process in the database"""
@@ -195,6 +194,7 @@ class Process(object):
                 "project": self.project.arango_doc._id,
                 "status": self.status,
                 "name": self.name,
+                "rank": self.rank,
                 "parameters" : self.parameters,
                 "description" : self.__class__.__doc__
             }
@@ -215,7 +215,7 @@ class Process(object):
         self.ancestors[process]["status"] = process.status
         self.ancestors_finished.add(self.ancestors[process]["argument_name"])
         
-        if process.status == consts.STATUS_DONE :
+        if process.status == consts["STATUS"]["DONE"] :
             self.ancestors_ready.add(self.ancestors[process]["argument_name"])
         
         if len(self.ancestors_ready) == len(self.ancestors) :
@@ -239,11 +239,11 @@ class Process(object):
         try:
             self.result = self.run()
         except Exception as e:
-            self.update_status(consts.STATUS_ERROR)
+            self.update_status(consts["STATUS"]["ERROR"])
             update_end_date()
             self.project.notify_error(self)
         else :
-            self.update_status(consts.STATUS_DONE)
+            self.update_status(consts["STATUS"]["DONE"])
             update_end_date()
             self.join()
 
@@ -255,10 +255,10 @@ class Process(object):
         return self.result
 
 class Result(Process):
-    """A result is a process with (usually) low critical level that takes care of fromating results, saving in the database or serializaing them to disk"""
+    """A result is a process with (usually) low critical rank that takes care of fromating results, saving in the database or serializaing them to disk"""
     
-    def __init__(self, project, level = consts.LEVEL_NOT_CRITICAL, **kwargs):
-        super(Result, self).__init__(project = project, level = level, **kwargs)
+    def __init__(self, project, rank = consts.RANKS["NOT_CRITICAL"], **kwargs):
+        super(Result, self).__init__(project = project, rank = rank, **kwargs)
 
     def _db_create(self) :
         """create the process and its result in the db"""
@@ -272,6 +272,7 @@ class Result(Process):
                 "status": self.status,
                 "name": self.name,
                 "parameters" : self.parameters,
+                "rank": self.rank,
                 "description" : self.__class__.__doc__
             }
         )

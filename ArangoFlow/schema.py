@@ -15,12 +15,11 @@ class Projects(Collection) :
         "start_date" : Field(validators = [VAL.NotNull()]),
         "end_date" : Field(),
         "name" : Field(validators = [VAL.NotNull()]),
-        "status": Field(validators = [VAL.Enumeration([consts.STATUS_PENDING, consts.STATUS_DONE, consts.STATUS_ERROR, consts.STATUS_WORKING])], default = consts.STATUS_PENDING),
+        "status": Field(validators = [VAL.Enumeration([consts.STATUS.values()])], default = consts.STATUS["PENDING"]),
         # "description": Field(validators = [VAL.NotNull()]),
     }
 
 class Processes(Collection) :
-    
     _validation = {
         "on_save" : True,
         "on_set" : True,
@@ -31,14 +30,14 @@ class Processes(Collection) :
         "start_date" : Field(),
         "end_date" : Field(),
         "project" : Field(validators = [VAL.NotNull()]),
-        "status": Field(validators = [VAL.Enumeration([consts.STATUS_PENDING, consts.STATUS_DONE, consts.STATUS_ERROR, consts.STATUS_WORKING])], default = consts.STATUS_PENDING),
+        "status": Field(validators = [VAL.Enumeration([consts.STATUS.values()])], default = consts.STATUS["PENDING"]),
+        "rank": Field(validators = [VAL.Enumeration([consts.RANKS.values()])]),
         "name" : Field(validators = [VAL.NotNull()]),
         "parameters" : {},
         "description": Field(validators = [VAL.NotNull()])
     }
 
 class Results(Collection):
-    """docstring for Result"""
     _validation = {
         "on_save" : True,
         "on_set" : True,
@@ -49,7 +48,8 @@ class Results(Collection):
         "start_date" : Field(),
         "end_date" : Field(),
         "project" : Field(validators = [VAL.NotNull()]),
-        "status": Field(validators = [VAL.Enumeration([consts.STATUS_PENDING, consts.STATUS_DONE, consts.STATUS_ERROR, consts.STATUS_WORKING])], default = consts.STATUS_PENDING),
+        "status": Field(validators = [VAL.Enumeration([consts.STATUS.values()])], default = consts.STATUS["PENDING"]),
+        "rank": Field(validators = [VAL.Enumeration([consts.RANKS.values()])]),
         "name" : Field(validators = [VAL.NotNull()]),
         "parameters" : {},
         "description": Field(validators = [VAL.NotNull()])
