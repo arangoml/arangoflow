@@ -15,7 +15,7 @@ class Projects(Collection) :
         "start_date" : Field(validators = [VAL.NotNull()]),
         "end_date" : Field(),
         "name" : Field(validators = [VAL.NotNull()]),
-        "status": Field(validators = [VAL.Enumeration([consts.STATUS.values()])], default = consts.STATUS["PENDING"]),
+        "status": Field(validators = [VAL.Enumeration(consts.STATUS.values())], default = consts.STATUS["PENDING"]),
         # "description": Field(validators = [VAL.NotNull()]),
     }
 
@@ -30,8 +30,8 @@ class Processes(Collection) :
         "start_date" : Field(),
         "end_date" : Field(),
         "project" : Field(validators = [VAL.NotNull()]),
-        "status": Field(validators = [VAL.Enumeration([consts.STATUS.values()])], default = consts.STATUS["PENDING"]),
-        "rank": Field(validators = [VAL.Enumeration([consts.RANKS.values()])]),
+        "status": Field(validators = [VAL.Enumeration(consts.STATUS.values())], default = consts.STATUS["PENDING"]),
+        "rank": Field(validators = [VAL.Enumeration(consts.RANKS.values())]),
         "name" : Field(validators = [VAL.NotNull()]),
         "parameters" : {},
         "description": Field(validators = [VAL.NotNull()])
@@ -48,8 +48,8 @@ class Results(Collection):
         "start_date" : Field(),
         "end_date" : Field(),
         "project" : Field(validators = [VAL.NotNull()]),
-        "status": Field(validators = [VAL.Enumeration([consts.STATUS.values()])], default = consts.STATUS["PENDING"]),
-        "rank": Field(validators = [VAL.Enumeration([consts.RANKS.values()])]),
+        "status": Field(validators = [VAL.Enumeration(consts.STATUS.values())], default = consts.STATUS["PENDING"]),
+        "rank": Field(validators = [VAL.Enumeration(consts.RANKS.values())]),
         "name" : Field(validators = [VAL.NotNull()]),
         "parameters" : {},
         "description": Field(validators = [VAL.NotNull()])

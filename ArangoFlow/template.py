@@ -13,7 +13,7 @@ class FlowProject(object):
     def __init__(self, database, project_name):
         super(FlowProject, self).__init__()
        
-        self.status = consts["STATUS"]["PENDING"]
+        self.status = consts.STATUS["PENDING"]
         
         self.database = database
         
@@ -32,19 +32,19 @@ class FlowProject(object):
     def update_status(self, status) :
         """update the project status"""
         self.status = status
-        self.arango_doc["status"]= status
+        self.arango_doc["status"] = status
         self.arango_doc.patch()
 
     def notify_error(self, process) :
         """notify the project that a process has ended with a error. If the process as critical it ends the run"""
         if process.rank == consts.RANKS["CRITICAL"] :
-            self.update_status(consts["STATUS"]["ERROR"]) 
+            self.update_status(consts.STATUS["ERROR"]) 
             raise exceptions.CriticalFailure("Process: %s, _id : %s, ended with an error" % (process.name, process.arango_doc._id))
 
     def _db_setup(self):
         """setups the database, creates collections and graph"""
         import time
-
+        
         for col_name in ("Projects", "Processes", "Pipes", "Results") :
             try :
                 self.database.createCollection(col_name)
@@ -70,9 +70,7 @@ class FlowProject(object):
 
     def _build_traverse(self, start_node = None) :
         """creates the run graph in the database"""
-        if self.must_setup :
-            self._db_setup()
-
+        
         if start_node is None :
             for inp in self.inputs :
                 inp._db_create()
@@ -89,8 +87,11 @@ class FlowProject(object):
     def run(self):
         """build the pipelne graph and runs it"""
         import time
+        
+        if self.must_setup :
+            self._db_setup()
 
-        self.update_status(consts["STATUS"]["RUNNING"]) 
+        self.update_status(consts.STATUS["RUNNING"]) 
         
         print("building symbolic graph in arangodb...")
         self._build_traverse()
@@ -100,7 +101,7 @@ class FlowProject(object):
         for inp in self.inputs :
             inp._run()
         self.arango_doc["end_date"] = time.time()
-        self.update_status(consts["STATUS"]["DONE"]) 
+        self.update_status(consts.STATUS["DONE"]) 
         self.arango_doc.patch()
         print("done")
 
@@ -164,7 +165,7 @@ class Process(object):
         super(Process, self).__init__()
         
         self.rank = consts.RANKS["CRITICAL"]
-        self.status = consts["STATUS"]["PENDING"]
+        self.status = consts.STATUS["PENDING"]
         
         self.project = project
 
@@ -215,7 +216,7 @@ class Process(object):
         self.ancestors[process]["status"] = process.status
         self.ancestors_finished.add(self.ancestors[process]["argument_name"])
         
-        if process.status == consts["STATUS"]["DONE"] :
+        if process.status == consts.STATUS["DONE"] :
             self.ancestors_ready.add(self.ancestors[process]["argument_name"])
         
         if len(self.ancestors_ready) == len(self.ancestors) :
@@ -239,11 +240,11 @@ class Process(object):
         try:
             self.result = self.run()
         except Exception as e:
-            self.update_status(consts["STATUS"]["ERROR"])
+            self.update_status(consts.STATUS["ERROR"])
             update_end_date()
             self.project.notify_error(self)
         else :
-            self.update_status(consts["STATUS"]["DONE"])
+            self.update_status(consts.STATUS["DONE"])
             update_end_date()
             self.join()
 
