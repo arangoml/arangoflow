@@ -70,7 +70,7 @@ class FlowProject(object):
 
     def _build_traverse(self, start_node = None) :
         """creates the run graph in the database"""
-        
+
         if start_node is None :
             for inp in self.inputs :
                 inp._db_create()
@@ -81,7 +81,7 @@ class FlowProject(object):
         else :
             for desc in start_node.descendants :
                 desc._db_create()
-                self.database.graphs["ArangoFlow_graph"].link("Pipes", start_node.arango_doc, desc.arango_doc, {})
+                e = self.database.graphs["ArangoFlow_graph"].link("Pipes", start_node.arango_doc, desc.arango_doc, {})
                 self._build_traverse(desc)
 
     def run(self):
@@ -179,7 +179,9 @@ class Process(object):
         self.result = None
         
         self.project.register_process(self)
-    
+        
+        self.must_setup = True
+
     def update_critical_rank(self, rank) :
         """Update the rank of impotance of the process"""
         self.rank = rank
@@ -187,7 +189,10 @@ class Process(object):
     def _db_create(self) :
         """create the process in the database"""
         import time
- 
+        
+        if not self.must_setup :
+            return True
+
         self.arango_doc = self.project.database["Processes"].createDocument()
         self.arango_doc.set(
             {
@@ -201,6 +206,8 @@ class Process(object):
             }
         )
         self.arango_doc.save()
+
+        self.must_setup = False
 
     def register_descendant(self, process) :
         """Register a process as being a descendent of self"""

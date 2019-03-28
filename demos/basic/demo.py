@@ -56,11 +56,6 @@ class Append(template.Process):
         self.axis = axis
 
     def run(self) :
-        print(self.ancestors)
-        for v in self.ancestors :
-            print(v)
-            print(v.descendants)
-
         return numpy.append( self.mat1(), self.mat2() )
 
 class SerializeMatrix(template.Result):
@@ -108,7 +103,7 @@ if __name__ == '__main__':
 
         project.run()
 
-        print(mat.result)
-        print(fmat.result)
-        print(nmat.result)
+        # print(mat.result)
+        # print(fmat.result)
+        # print(nmat.result)
     
