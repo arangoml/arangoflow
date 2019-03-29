@@ -135,7 +135,7 @@ class Process(object):
         ancestors = {}
     
         for k, v in kwargs.items() :
-            if isinstance(v, Process) :
+            if isinstance(v, Process) and k != "self" :
                 ancestors[v] = {"status": v.status, "argument_name": k}
                 v.register_descendant(obj)
             elif not isinstance(v, FlowProject) :
@@ -145,7 +145,7 @@ class Process(object):
         frame_args = inspect.getargvalues(frame).locals["args"]
         if len(frame_args) > 0 :
             for i, kv in enumerate(sig.parameters.items()) :
-                if i > 0 :
+                if i > 0 : #skip self argument
                     j = i-1
                     if kv[0] in kwargs :
                         break #args finished, entering into kwargs

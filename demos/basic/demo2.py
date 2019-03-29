@@ -23,17 +23,6 @@ class Threshold(template.Process):
         index = mat > self.threshold
         return mat[index]
 
-class Scale(template.Process):
-    """multply the value of the previous element by value"""
-    def __init__(self, project, previous, scale):
-        super(Scale, self).__init__(project)
-        self.previous = previous
-        self.scale = scale
-
-    def run(self) :
-        # print(self.descendants)
-        return self.previous.result * self.scale
-
 class Normalize(template.Process):
     """Substract the mean and divide by the std"""
     def __init__(self, project, previous):
@@ -57,17 +46,6 @@ class Append(template.Process):
 
     def run(self) :
         return numpy.append( self.mat1(), self.mat2() )
-
-class SerializeMatrix(template.Result):
-    """Save a matrix on disk in a txt format"""
-    def __init__(self, project, previous, filename):
-        super(SerializeMatrix, self).__init__(project)
-        self.previous = previous
-        self.filename = filename
-
-    def run(self) :
-        numpy.savetxt(self.filename, self.previous.result)
-        return True
 
 if __name__ == '__main__':
     DB_URL = "http://localhost:8529"
