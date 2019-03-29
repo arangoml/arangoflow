@@ -160,12 +160,13 @@ class Process(object):
         obj.ancestors = ancestors
         return obj
 
-    def __init__(self, project, rank = consts.RANKS["CRITICAL"], **kwargs):
+    def __init__(self, project, rank = consts.RANKS["CRITICAL"], checkpoint=True, **kwargs):
         """The first argument must allways be the project. A precess with critical rank will end the run. A process with no critical rank should only end its branch (not implemented, see: recieve_ancestor_join) """
         super(Process, self).__init__()
         
         self.rank = consts.RANKS["CRITICAL"]
         self.status = consts.STATUS["PENDING"]
+        self.checkpoint = checkpoint
         
         self.project = project
 
@@ -173,7 +174,7 @@ class Process(object):
         
         self.ancestors_ready = set()
         self.ancestors_finished = set()
-        
+
         if not hasattr(self, "descendants") :
            self.descendants = []
         self.result = None
@@ -202,6 +203,7 @@ class Process(object):
                 "name": self.name,
                 "rank": self.rank,
                 "parameters" : self.parameters,
+                "checkpoint": self.checkpoint,
                 "description" : self.__class__.__doc__
             }
         )
@@ -237,6 +239,10 @@ class Process(object):
         self.arango_doc["status"]= status
         self.arango_doc.patch()
 
+    def _save_checkpoint(self) :
+        """TODO: save the resulting data on disk so it can reloaded if necessary"""
+        pass
+
     def _run(self) :
         """private run function, takes care notifications and updating status"""
         def update_end_date() :
@@ -252,6 +258,9 @@ class Process(object):
             self.project.notify_error(self)
         else :
             self.update_status(consts.STATUS["DONE"])
+            if self.checkpoint
+                self._save_checkpoint()
+
             update_end_date()
             self.join()
 
@@ -265,7 +274,7 @@ class Process(object):
 class Result(Process):
     """A result is a process with (usually) low critical rank that takes care of fromating results, saving in the database or serializaing them to disk"""
     
-    def __init__(self, project, rank = consts.RANKS["NOT_CRITICAL"], **kwargs):
+    def __init__(self, project, rank = consts.RANKS["NOT_CRITICAL"], checkpoint=False, **kwargs):
         super(Result, self).__init__(project = project, rank = rank, **kwargs)
 
     def _db_create(self) :
