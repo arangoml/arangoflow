@@ -1,6 +1,6 @@
 
 import grequests
-# import uuid
+import uuid
 from . import consts
 from . import schema
 from . import exceptions
@@ -162,8 +162,7 @@ class Process(object):
         obj.parameters = parameters
         obj.ancestors = ancestors
         obj.uuid = str(uuid.uuid4())
-        obj.full_uuid = None
-
+        
         return obj
 
     def __init__(self, project, rank = consts.RANKS["CRITICAL"], checkpoint=True, **kwargs):
@@ -191,7 +190,7 @@ class Process(object):
 
     @property
     def full_uuid(self):
-        parents = ','.join([for a in self.ancestors: a.full_uuid()])
+        parents = ','.join([a.full_uuid() for a in self.ancestors ])
         self._full_uuid = "%s(%s)" % (self.uuid, parents)
         return self._full_uuid
     

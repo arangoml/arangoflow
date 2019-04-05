@@ -100,6 +100,7 @@ if __name__ == '__main__':
 
         con = Append(project, nmat, smat2, axis = 1)
         SerializeMatrix(project, con, "Stack.txt")
+        norm2 = Normalize(project, con)
 
         project.run()
 
