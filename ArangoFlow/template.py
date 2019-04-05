@@ -258,7 +258,7 @@ class Process(object):
             self.project.notify_error(self)
         else :
             self.update_status(consts.STATUS["DONE"])
-            if self.checkpoint
+            if self.checkpoint:
                 self._save_checkpoint()
 
             update_end_date()

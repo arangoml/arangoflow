@@ -33,7 +33,7 @@ class Processes(Collection) :
         "status": Field(validators = [VAL.Enumeration(consts.STATUS.values())], default = consts.STATUS["PENDING"]),
         "rank": Field(validators = [VAL.Enumeration(consts.RANKS.values())]),
         "name" : Field(validators = [VAL.NotNull()]),
-        "checkpoint" : Field(validators = [VAL.Boolean(), VAL.NotNull()], default=True),
+        "checkpoint" : Field(validators = [VAL.Bool(), VAL.NotNull()], default=True),
         "parameters" : {},
         "description": Field(validators = [VAL.NotNull()])
     }
