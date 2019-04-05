@@ -1,5 +1,6 @@
 
 import grequests
+# import uuid
 from . import consts
 from . import schema
 from . import exceptions
@@ -22,6 +23,8 @@ class FlowProject(object):
         self.inputs = []
 
         self.must_setup = True
+        self.uuid = str(uuid.uuid4())
+        self.full_uuid = self.uuid
 
     def register_process(self, process) :
         """registers a process to the project and finds inputs"""
@@ -158,6 +161,9 @@ class Process(object):
 
         obj.parameters = parameters
         obj.ancestors = ancestors
+        obj.uuid = str(uuid.uuid4())
+        obj.full_uuid = None
+
         return obj
 
     def __init__(self, project, rank = consts.RANKS["CRITICAL"], checkpoint=True, **kwargs):
@@ -183,6 +189,12 @@ class Process(object):
         
         self.must_setup = True
 
+    @property
+    def full_uuid(self):
+        parents = ','.join([for a in self.ancestors: a.full_uuid()])
+        self._full_uuid = "%s(%s)" % (self.uuid, parents)
+        return self._full_uuid
+    
     def update_critical_rank(self, rank) :
         """Update the rank of impotance of the process"""
         self.rank = rank
