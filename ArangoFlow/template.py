@@ -24,7 +24,7 @@ class FlowProject(object):
 
         self.must_setup = True
         self.uuid = str(uuid.uuid4())
-        self.full_uuid = self.uuid
+        self.path_uuid = self.uuid
 
     def register_process(self, process) :
         """registers a process to the project and finds inputs"""
@@ -66,6 +66,8 @@ class FlowProject(object):
                 "start_date" : time.time(),
                 "name" : self.name,
                 "status": self.status,
+                "uuid": self.uuid,
+                "path_uuid": self.path_uuid
             }
         )
         self.arango_doc.save()
@@ -189,10 +191,10 @@ class Process(object):
         self.must_setup = True
 
     @property
-    def full_uuid(self):
-        parents = ','.join([a.full_uuid() for a in self.ancestors ])
-        self._full_uuid = "%s(%s)" % (self.uuid, parents)
-        return self._full_uuid
+    def path_uuid(self):
+        parents = ','.join([a.path_uuid for a in self.ancestors ])
+        path_uuid = "%s(%s)" % (self.uuid, parents)
+        return path_uuid
     
     def update_critical_rank(self, rank) :
         """Update the rank of impotance of the process"""
@@ -215,6 +217,8 @@ class Process(object):
                 "rank": self.rank,
                 "parameters" : self.parameters,
                 "checkpoint": self.checkpoint,
+                "uuid": self.uuid,
+                "path_uuid": self.path_uuid,
                 "description" : self.__class__.__doc__
             }
         )
@@ -301,6 +305,8 @@ class Result(Process):
                 "name": self.name,
                 "parameters" : self.parameters,
                 "rank": self.rank,
+                "uuid": self.uuid,
+                "path_uuid": self.path_uuid,
                 "description" : self.__class__.__doc__
             }
         )

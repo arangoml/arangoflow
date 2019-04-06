@@ -16,6 +16,8 @@ class Projects(Collection) :
         "end_date" : Field(),
         "name" : Field(validators = [VAL.NotNull()]),
         "status": Field(validators = [VAL.Enumeration(consts.STATUS.values())], default = consts.STATUS["PENDING"]),
+        "uuid": Field(validators = [VAL.NotNull()]),
+        "path_uuid": Field(validators = [VAL.NotNull()])
         # "description": Field(validators = [VAL.NotNull()]),
     }
 
@@ -35,6 +37,8 @@ class Processes(Collection) :
         "name" : Field(validators = [VAL.NotNull()]),
         "checkpoint" : Field(validators = [VAL.Bool(), VAL.NotNull()], default=True),
         "parameters" : {},
+        "uuid": Field(validators = [VAL.NotNull()]),    
+        "path_uuid": Field(validators = [VAL.NotNull()]),
         "description": Field(validators = [VAL.NotNull()])
     }
 
@@ -53,6 +57,8 @@ class Results(Collection):
         "rank": Field(validators = [VAL.Enumeration(consts.RANKS.values())]),
         "name" : Field(validators = [VAL.NotNull()]),
         "parameters" : {},
+        "uuid": Field(validators = [VAL.NotNull()]),
+        "path_uuid": Field(validators = [VAL.NotNull()]),
         "description": Field(validators = [VAL.NotNull()])
     }
 
