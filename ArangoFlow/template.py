@@ -131,6 +131,7 @@ class Process(object):
     def __new__(cls, *args, **kwargs) :
         """Analyse the arguments passed to __init__ finds ancestors (other processes needed for the conputation) and parameters (anything else) """
         import inspect
+
         obj = super(Process, cls).__new__(cls)
         sig = inspect.signature(cls.__init__)
         if len(sig.parameters) != (len(args) + len(kwargs) + 1) : # +1 for self
@@ -203,6 +204,7 @@ class Process(object):
     def _db_create(self) :
         """create the process in the database"""
         import time
+        import inspect
         
         if not self.must_setup :
             return True
@@ -219,7 +221,7 @@ class Process(object):
                 "checkpoint": self.checkpoint,
                 "uuid": self.uuid,
                 "path_uuid": self.path_uuid,
-                "description" : self.__class__.__doc__
+                "description" : inspect.cleandoc(self.__class__.__doc__)
             }
         )
         self.arango_doc.save()
@@ -295,7 +297,8 @@ class Result(Process):
     def _db_create(self) :
         """create the process and its result in the db"""
         import time
- 
+        import inspect
+        
         self.arango_doc = self.project.database["Results"].createDocument()
         self.arango_doc.set(
             {
@@ -307,7 +310,7 @@ class Result(Process):
                 "rank": self.rank,
                 "uuid": self.uuid,
                 "path_uuid": self.path_uuid,
-                "description" : self.__class__.__doc__
+                "description" : inspect.cleandoc(self.__class__.__doc__)
             }
         )
         self.arango_doc.save()
