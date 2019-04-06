@@ -5,13 +5,13 @@ from . import consts
 from . import schema
 from . import exceptions
 
-        
+
 class FlowProject(object):
     """Representation of a project in ArangodDB.
     @param database : pyArango Database object
     @param project_name : the name of the project used to identify it (does not have to be unique)
     """
-    def __init__(self, database, project_name):
+    def __init__(self, database, project_name, run_id = None):
         super(FlowProject, self).__init__()
        
         self.status = consts.STATUS["PENDING"]
@@ -25,6 +25,8 @@ class FlowProject(object):
         self.must_setup = True
         self.uuid = str(uuid.uuid4())
         self.path_uuid = self.uuid
+
+        self.run_id = run_id
 
     def register_process(self, process) :
         """registers a process to the project and finds inputs"""
@@ -52,22 +54,40 @@ class FlowProject(object):
             try :
                 self.database.createCollection(col_name)
             except Exception as e :
-                self.database[col_name].truncate()
+                pass
+                # self.database[col_name].truncate()
         
+        self.database["Projects"].ensureHashIndex("name")
+        self.database["Projects"].ensureSkipIndex("run")
+
         try :
             self.database.createGraph("ArangoFlow_graph")
         except Exception as e :
             pass
 
-        self.arango_doc = self.database["Projects"].createDocument()
-        
+        aql = """
+            FOR p in Peojects
+                FILTER p.name == @name
+                SORT p.run DESC
+                LIMIT 1
+                RETURN p.run
+        """
+
+        q = self.database.AQLQuery(aql, batchSize = 1, bindVars = {"name": self.name}, rawResluls = True)
+
+        try :
+            self.run_id = q[0] + 1
+        except IndexError :
+            self.run_id = 0
+
         self.arango_doc.set(
             {
                 "start_date" : time.time(),
                 "name" : self.name,
                 "status": self.status,
                 "uuid": self.uuid,
-                "path_uuid": self.path_uuid
+                "path_uuid": self.path_uuid,
+                "run": self.run_id
             }
         )
         self.arango_doc.save()

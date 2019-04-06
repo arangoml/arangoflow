@@ -16,6 +16,7 @@ class Projects(Collection) :
         "end_date" : Field(),
         "name" : Field(validators = [VAL.NotNull()]),
         "status": Field(validators = [VAL.Enumeration(consts.STATUS.values())], default = consts.STATUS["PENDING"]),
+        "run": Field(validators = [VAL.NotNull()]),
         "uuid": Field(validators = [VAL.NotNull()]),
         "path_uuid": Field(validators = [VAL.NotNull()])
         # "description": Field(validators = [VAL.NotNull()]),
