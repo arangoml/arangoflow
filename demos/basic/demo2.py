@@ -9,6 +9,7 @@ class RandomMatrix(template.Process):
         self.size = size
 
     def run(self) :
+        import inspect
         return numpy.random.random(self.size)
 
 class Threshold(template.Process):

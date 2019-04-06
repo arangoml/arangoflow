@@ -1,6 +1,5 @@
 
 import grequests
-import uuid
 from . import consts
 from . import schema
 from . import exceptions
@@ -13,6 +12,8 @@ class FlowProject(object):
     """
     def __init__(self, database, project_name, run_id = None):
         super(FlowProject, self).__init__()
+        
+        import uuid
        
         self.status = consts.STATUS["PENDING"]
         
@@ -151,6 +152,8 @@ class Process(object):
     def __new__(cls, *args, **kwargs) :
         """Analyse the arguments passed to __init__ finds ancestors (other processes needed for the conputation) and parameters (anything else) """
         import inspect
+        import hashlib
+
         obj = super(Process, cls).__new__(cls)
         sig = inspect.signature(cls.__init__)
         if len(sig.parameters) != (len(args) + len(kwargs) + 1) : # +1 for self
@@ -183,7 +186,18 @@ class Process(object):
 
         obj.parameters = parameters
         obj.ancestors = ancestors
-        obj.uuid = str(uuid.uuid4())
+        
+        src = []
+        obj.uuid = None
+        for fct_name in dir(obj):
+            fct = getattr(obj, fct_name)
+            if callable(fct) :
+                try:
+                    src.append( inspect.getsource(fct) )
+                except TypeError as e:
+                    src.append(fct_name)
+    
+        obj.uuid = hashlib.md5(''.join(src).encode('utf-8')).hexdigest()
         
         return obj
 
@@ -223,6 +237,7 @@ class Process(object):
     def _db_create(self) :
         """create the process in the database"""
         import time
+        import inspect
         
         if not self.must_setup :
             return True
@@ -239,7 +254,7 @@ class Process(object):
                 "checkpoint": self.checkpoint,
                 "uuid": self.uuid,
                 "path_uuid": self.path_uuid,
-                "description" : self.__class__.__doc__
+                "description" : inspect.cleandoc(self.__class__.__doc__)
             }
         )
         self.arango_doc.save()
@@ -315,7 +330,8 @@ class Result(Process):
     def _db_create(self) :
         """create the process and its result in the db"""
         import time
- 
+        import inspect
+
         self.arango_doc = self.project.database["Results"].createDocument()
         self.arango_doc.set(
             {
@@ -327,7 +343,7 @@ class Result(Process):
                 "rank": self.rank,
                 "uuid": self.uuid,
                 "path_uuid": self.path_uuid,
-                "description" : self.__class__.__doc__
+                "description" : inspect.cleandoc(self.__class__.__doc__)
             }
         )
         self.arango_doc.save()
