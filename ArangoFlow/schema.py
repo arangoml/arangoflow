@@ -39,7 +39,29 @@ class Processes(Collection) :
         "parameters" : {},
         "uuid": Field(validators = [VAL.NotNull()]),    
         "path_uuid": Field(validators = [VAL.NotNull()]),
-        "description": Field(validators = [VAL.NotNull()])
+        "description": Field(validators = [VAL.NotNull()]),
+        "ticks": Field()
+    }
+
+class Monitors(Collection):
+    _validation = {
+        "on_save" : True,
+        "on_set" : True,
+        "allow_foreign_fields" : True
+    }
+
+    _fields = {
+        "start_date" : Field(),
+        "end_date" : Field(),
+        "project" : Field(validators = [VAL.NotNull()]),
+        "status": Field(validators = [VAL.Enumeration(consts.STATUS.values())], default = consts.STATUS["PENDING"]),
+        "rank": Field(validators = [VAL.Enumeration(consts.RANKS.values())]),
+        "name" : Field(validators = [VAL.NotNull()]),
+        "parameters" : {},
+        "uuid": Field(validators = [VAL.NotNull()]),
+        "path_uuid": Field(validators = [VAL.NotNull()]),
+        "description": Field(validators = [VAL.NotNull()]),
+        "ticks": Field()
     }
 
 class Results(Collection):

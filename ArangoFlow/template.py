@@ -49,7 +49,7 @@ class FlowProject(object):
         """setups the database, creates collections and graph"""
         import time
         
-        for col_name in ("Projects", "Processes", "Pipes", "Results") :
+        for col_name in ("Projects", "Processes", "Pipes", "Results", "Monitors") :
             try :
                 self.database.createCollection(col_name)
             except Exception as e :
@@ -144,8 +144,8 @@ class ProcessPlaceholderField(Node):
 
     def __call__() :
         return self.result
-        
-class Process(Node):
+
+class MetaProcess(Node):
     """Processes are atomic routines that take an arbitrary number of inputs and return a single outputs
     All processes received as arguments to __init__ are considered ancestors. A process will not run until
     all it's ancestors have successfully finished. All other arguments are considered parameteres and will
@@ -153,12 +153,13 @@ class Process(Node):
     To use ArangoFlow, users will have to create their own processes by inheriting from this class. The must
     at least define the run() function. The end results of a process are stored in self.result
     """
+        
     def __new__(cls, *args, **kwargs) :
         """Analyse the arguments passed to __init__ finds ancestors (other processes needed for the conputation) and parameters (anything else) """
         import inspect
         import hashlib
 
-        obj = super(Process, cls).__new__(cls)
+        obj = super(MetaProcess, cls).__new__(cls)
         sig = inspect.signature(cls.__init__)
         if len(sig.parameters) != (len(args) + len(kwargs) + 1) : # +1 for self
             raise exceptions.ArgumentError("Expected %s arguments, got %s" % (len(sig.parameters), len(args) + len(kwargs) +1 ), sig.parameters )
@@ -167,15 +168,16 @@ class Process(Node):
         ancestors = {}
     
         for k, v in kwargs.items() :
-            if isinstance(v, Node) and k != "self" :
-                if isinstance(v, ProcessPlaceholderField) :
-                    ancestors[v.process] = {"status": v.process.status, "argument_name": k, 'field': v.field}
-                    v.process.register_descendant(obj)
-                else :
-                    ancestors[v] = {"status": v.status, "argument_name": k, 'field': None}
-                    v.register_descendant(obj)
-            elif not isinstance(v, FlowProject) :
-                parameters[k] = v
+            if k not in ["project", "collection_name", "rank", "checkpoint"] :
+                if isinstance(v, Node) and k != "self" :
+                    if isinstance(v, ProcessPlaceholderField) :
+                        ancestors[v.process] = {"status": v.process.status, "argument_name": k, 'field': v.field}
+                        v.process.register_descendant(obj)
+                    else :
+                        ancestors[v] = {"status": v.status, "argument_name": k, 'field': None}
+                        v.register_descendant(obj)
+                elif not isinstance(v, FlowProject) :
+                    parameters[k] = v
 
         frame = inspect.currentframe()
         frame_args = inspect.getargvalues(frame).locals["args"]
@@ -186,7 +188,7 @@ class Process(Node):
                     if kv[0] in kwargs :
                         break #args finished, entering into kwargs
                     
-                    if isinstance(frame_args[j], Process) :
+                    if isinstance(frame_args[j], MetaProcess) :
                         if isinstance(frame_args[j], ProcessPlaceholderField) :
                             ancestors[frame_args[j].process] = {"status": frame_args[j].process.status, "argument_name": kv[0], "field": frame_args[j].field}
                             frame_args[j].process.register_descendant(obj)
@@ -213,10 +215,11 @@ class Process(Node):
         
         return obj
 
-    def __init__(self, project, rank = consts.RANKS["CRITICAL"], checkpoint=True, **kwargs):
+    def __init__(self, project, collection_name, rank = consts.RANKS["CRITICAL"], checkpoint=True, **kwargs):
         """The first argument must allways be the project. A precess with critical rank will end the run. A process with no critical rank should only end its branch (not implemented, see: recieve_ancestor_join) """
-        super(Process, self).__init__()
+        super(MetaProcess, self).__init__()
         
+        self.collection_name = collection_name
         self.rank = consts.RANKS["CRITICAL"]
         self.status = consts.STATUS["PENDING"]
         self.checkpoint = checkpoint
@@ -254,10 +257,10 @@ class Process(Node):
         if not self.must_setup :
             return True
 
-        self.arango_doc = self.project.database["Processes"].createDocument()
+        self.arango_doc = self.project.database[self.collection_name].createDocument()
         self.arango_doc.set(
             {
-                "start_date" : time.time(),
+                "start_date" : None,
                 "project": self.project.arango_doc._id,
                 "status": self.status,
                 "name": self.name,
@@ -278,9 +281,13 @@ class Process(Node):
         self.descendants.append(process)
 
     def join(self) :
-        """joins deceendents at the end of the run"""
+        """joins decendents at the end of the run"""
         for d in self.descendants :
             d.recieve_ancestor_join(self)
+    
+    def tick(self, tick_handle) :
+        for d in self.descendants :
+            d.recieve_tick_notification(self, tick_handle)
     
     def recieve_ancestor_join(self, process) :
         """receive an end of run notification from an ancestor. If process has at least one of it's ancestors termiate with a error, it will raise a RuntimeError"""
@@ -307,11 +314,16 @@ class Process(Node):
 
     def _run(self) :
         """private run function, takes care notifications and updating status"""
+        import time
+        def update_start_date() :
+            self.arango_doc["start_date"] = time.time()
+            self.arango_doc.patch()
+        
         def update_end_date() :
-            import time
             self.arango_doc["end_date"] = time.time()
             self.arango_doc.patch()
 
+        update_start_date()
         try:
             self.result = self.run()
         except Exception as e:
@@ -336,30 +348,56 @@ class Process(Node):
     def __call__(self) :
         return self.result
 
-class Result(Process):
+class Process(MetaProcess):
+    """docstring for Process"""
+    def __init__(self, project, **kwargs):
+        super(Process, self).__init__(project = project, collection_name = "Processes", *args, **kwargs)
+
+class Monitor(Process):
+    """docstring for Monitor"""
+
+    def __init__(self, project, rank=consts.RANKS["NOT_CRITICAL"], tick_handles = None, **kwargs):
+        super(Process, self).__init__(project = project, collection_name = "Monitors", rank = rank, *args, **kwargs)
+        self.tick_handles = tick_handles
+    
+   def recieve_tick_notification(self, process, tick_handle) :
+    if tick_handle in self.tick_handles :
+        self.tick_run(process, tick_handle)
+
+    def _tick_run(self, process, tick_handle) :
+        import time
+
+        self.update_status(consts.STATUS["RUNNING"])
+
+        tick_dct = {
+            "start_date": time.time(),
+            "end_date": None,
+            "process_id": process.arango_doc["_id"],
+            "process_uuid": process.arango_doc["uuid"],
+            "process_path_uuid": process.arango_doc["path_uuid"],
+            "status": consts.STATUS["RUNNING"]
+        }
+
+        try:
+            self.tick_run(process, tick_handle)
+        except Exception as e:
+            tick_dct["status"] = consts.STATUS["ERROR"]
+        else :
+            tick_dct["status"] = consts.STATUS["DONE"]
+        
+        tick_dct["end_date"] = time.time()
+        self.update_status(consts.STATUS["PENDING"])
+        self.arango_doc["ticks"].append(tick)
+        self.arango_doc.patch
+
+    def tick_run(self) :
+        raise NotImplementedError("Must be implemented in child")
+
+    def run(self) :
+        pass
+  
+class Result(MetaProcess):
     """A result is a process with (usually) low critical rank that takes care of fromating results, saving in the database or serializaing them to disk"""
     
     def __init__(self, project, rank = consts.RANKS["NOT_CRITICAL"], checkpoint=False, **kwargs):
-        super(Result, self).__init__(project = project, rank = rank, **kwargs)
-
-    def _db_create(self) :
-        """create the process and its result in the db"""
-        import time
-        import inspect
-
-        self.arango_doc = self.project.database["Results"].createDocument()
-        self.arango_doc.set(
-            {
-                "start_date" : time.time(),
-                "project": self.project.arango_doc._id,
-                "status": self.status,
-                "name": self.name,
-                "parameters" : self.parameters,
-                "rank": self.rank,
-                "uuid": self.uuid,
-                "path_uuid": self.path_uuid,
-                "description" : inspect.cleandoc(self.__class__.__doc__)
-            }
-        )
-        self.arango_doc.save()
-        
+        super(Result, self).__init__(project = project, rank = rank, collection_name = "Result", **kwargs)
