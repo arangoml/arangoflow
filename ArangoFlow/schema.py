@@ -71,7 +71,9 @@ class Pipes(Edges) :
         "allow_foreign_fields" : True
     }
 
-    _fields = {}
+    _fields = {
+        "field": Field()
+    }
 
 class ArangoFlow_graph(GR.Graph):
     _edgeDefinitions = (

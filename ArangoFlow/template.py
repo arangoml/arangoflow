@@ -82,12 +82,12 @@ class FlowProject(object):
                 inp._db_create()
                 for desc in inp.descendants :
                     desc._db_create()
-                    self.database.graphs["ArangoFlow_graph"].link("Pipes", inp.arango_doc._id, desc.arango_doc._id, {})
+                    self.database.graphs["ArangoFlow_graph"].link("Pipes", inp.arango_doc._id, desc.arango_doc._id, {"field": desc.ancestors[inp]["field"] } )
                     self._build_traverse(desc)
         else :
             for desc in start_node.descendants :
                 desc._db_create()
-                e = self.database.graphs["ArangoFlow_graph"].link("Pipes", start_node.arango_doc, desc.arango_doc, {})
+                e = self.database.graphs["ArangoFlow_graph"].link("Pipes", start_node.arango_doc, desc.arango_doc, {"field": desc.ancestors[start_node]["field"] })
                 self._build_traverse(desc)
 
     def run(self):
@@ -121,7 +121,31 @@ class FlowProject(object):
         self.arango_doc.patch()
 
 
-class Process(object):
+class Node(object):
+    """docstring for Node"""
+    def __init__(self):
+        super(Node, self).__init__()
+
+class ProcessPlaceholderField(Node):
+    """docstring for  ProcessPlaceholderField"""
+    def __init__(self, process, field):
+        super(ProcessPlaceholderField, self).__init__()
+        self.process = process
+        self.field = field
+
+    @property
+    def result(self):
+        self._result = self.process()[self.field]
+        return self._result
+    
+    def __getattr__(self, k) :
+        proc = super(ProcessPlaceholderField, self).__getattribute__('process')
+        return getattr(proc, k)
+
+    def __call__() :
+        return self.result
+        
+class Process(Node):
     """Processes are atomic routines that take an arbitrary number of inputs and return a single outputs
     All processes received as arguments to __init__ are considered ancestors. A process will not run until
     all it's ancestors have successfully finished. All other arguments are considered parameteres and will
@@ -143,9 +167,13 @@ class Process(object):
         ancestors = {}
     
         for k, v in kwargs.items() :
-            if isinstance(v, Process) and k != "self" :
-                ancestors[v] = {"status": v.status, "argument_name": k}
-                v.register_descendant(obj)
+            if isinstance(v, Node) and k != "self" :
+                if isinstance(v, ProcessPlaceholderField) :
+                    ancestors[v.process] = {"status": v.process.status, "argument_name": k, 'field': v.field}
+                    v.process.register_descendant(obj)
+                else :
+                    ancestors[v] = {"status": v.status, "argument_name": k, 'field': None}
+                    v.register_descendant(obj)
             elif not isinstance(v, FlowProject) :
                 parameters[k] = v
 
@@ -159,14 +187,18 @@ class Process(object):
                         break #args finished, entering into kwargs
                     
                     if isinstance(frame_args[j], Process) :
-                        ancestors[frame_args[j]] = {"status": frame_args[j].status, "argument_name": kv[0]}
-                        frame_args[j].register_descendant(obj)
+                        if isinstance(frame_args[j], ProcessPlaceholderField) :
+                            ancestors[frame_args[j].process] = {"status": frame_args[j].process.status, "argument_name": kv[0], "field": frame_args[j].field}
+                            frame_args[j].process.register_descendant(obj)
+                        else :
+                            ancestors[frame_args[j]] = {"status": frame_args[j].status, "argument_name": kv[0], "field": None}
+                            frame_args[j].register_descendant(obj)
                     elif not isinstance(frame_args[j], FlowProject) :
                         parameters[kv[0]] = frame_args[j]
 
         obj.parameters = parameters
         obj.ancestors = ancestors
-        
+
         src = []
         obj.uuid = None
         for fct_name in dir(obj):
@@ -297,6 +329,9 @@ class Process(object):
     def run(self) :
         """the function that users must redefine, must runs and return the output"""
         raise NotImplementedError("Must be implemented in child")
+
+    def __getitem__(self, k) :
+        return ProcessPlaceholderField(self, k)
 
     def __call__(self) :
         return self.result
