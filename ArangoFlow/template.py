@@ -146,18 +146,17 @@ class ProcessPlaceholderField(Node):
 
 class ProcessPlaceholderTick(Node):
     """docstring for  ProcessPlaceholderTick"""
-    def __init__(self, process, value, field):
+    def __init__(self, process, field):
         super(ProcessPlaceholderTick, self).__init__()
         self.process = process
-        self.value = value
         self.field = field
     
     def __getattr__(self, k) :
         proc = super(ProcessPlaceholderTick, self).__getattribute__('process')
         return getattr(proc, k)
 
-    def __call__() :
-        return self.value
+    # def __call__() :
+    #     return self.value
 
 class MetaProcess(Node):
     """Processes are atomic routines that take an arbitrary number of inputs and return a single outputs
@@ -371,20 +370,19 @@ class MetaProcess(Node):
 class Process(MetaProcess):
     """docstring for Process"""
     def __init__(self, project, **kwargs):
-        super(Process, self).__init__(project = project, collection_name = "Processes", *args, **kwargs)
+        super(Process, self).__init__(project = project, collection_name = "Processes", **kwargs)
 
 class Monitor(Process):
     """docstring for Monitor"""
 
     def __init__(self, project, tick_input, rank=consts.RANKS["NOT_CRITICAL"]):
         assert isinstance(tick_input, ProcessPlaceholderTick)
-
-        super(Process, self).__init__(project = project, collection_name = "Monitors")
+        super(Monitor, self).__init__(project = project, collection_name = "Monitors", rank=rank, checkpoint = False)
         self.tick_input = tick_input
     
-   def recieve_tick_notification(self, value, tick_field) :
-    if tick_field == self.tick_input.field :
-        self._tick_run(value)
+    def recieve_tick_notification(self, value, tick_field) :
+        if tick_field == self.tick_input.field :
+            self._tick_run(value)
 
     def _tick_run(self) :
         import time
