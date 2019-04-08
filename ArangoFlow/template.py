@@ -120,7 +120,6 @@ class FlowProject(object):
         self.arango_doc["end_date"] = time.time()
         self.arango_doc.patch()
 
-
 class Node(object):
     """docstring for Node"""
     def __init__(self):
@@ -144,6 +143,21 @@ class ProcessPlaceholderField(Node):
 
     def __call__() :
         return self.result
+
+class ProcessPlaceholderTick(Node):
+    """docstring for  ProcessPlaceholderTick"""
+    def __init__(self, process, value, field):
+        super(ProcessPlaceholderTick, self).__init__()
+        self.process = process
+        self.value = value
+        self.field = field
+    
+    def __getattr__(self, k) :
+        proc = super(ProcessPlaceholderTick, self).__getattribute__('process')
+        return getattr(proc, k)
+
+    def __call__() :
+        return self.value
 
 class MetaProcess(Node):
     """Processes are atomic routines that take an arbitrary number of inputs and return a single outputs
@@ -170,7 +184,7 @@ class MetaProcess(Node):
         for k, v in kwargs.items() :
             if k not in ["project", "collection_name", "rank", "checkpoint"] :
                 if isinstance(v, Node) and k != "self" :
-                    if isinstance(v, ProcessPlaceholderField) :
+                    if isinstance(v, ProcessPlaceholderField) or isinstance(v, ProcessPlaceholderTick) :
                         ancestors[v.process] = {"status": v.process.status, "argument_name": k, 'field': v.field}
                         v.process.register_descendant(obj)
                     else :
@@ -189,7 +203,7 @@ class MetaProcess(Node):
                         break #args finished, entering into kwargs
                     
                     if isinstance(frame_args[j], MetaProcess) :
-                        if isinstance(frame_args[j], ProcessPlaceholderField) :
+                        if isinstance(frame_args[j], ProcessPlaceholderField) or isinstance(frame_args[j], ProcessPlaceholderTick) :
                             ancestors[frame_args[j].process] = {"status": frame_args[j].process.status, "argument_name": kv[0], "field": frame_args[j].field}
                             frame_args[j].process.register_descendant(obj)
                         else :
@@ -238,6 +252,7 @@ class MetaProcess(Node):
         self.project.register_process(self)
         
         self.must_setup = True
+        self.monitors = []
 
     @property
     def path_uuid(self):
@@ -279,16 +294,21 @@ class MetaProcess(Node):
     def register_descendant(self, process) :
         """Register a process as being a descendent of self"""
         self.descendants.append(process)
+        if isinstance(process, Monitor) :
+            self.monitors.append(process)
 
     def join(self) :
         """joins decendents at the end of the run"""
         for d in self.descendants :
             d.recieve_ancestor_join(self)
     
-    def tick(self, tick_handle) :
-        for d in self.descendants :
-            d.recieve_tick_notification(self, tick_handle)
+    def tick(self, value, tick_field) :
+        for d in self.monitors :
+            d.recieve_tick_notification(self, value, tick_field)
     
+    def ticks(self, field) :
+        return ProcessPlaceholderTick(self, field)
+
     def recieve_ancestor_join(self, process) :
         """receive an end of run notification from an ancestor. If process has at least one of it's ancestors termiate with a error, it will raise a RuntimeError"""
         self.ancestors[process]["status"] = process.status
@@ -356,15 +376,17 @@ class Process(MetaProcess):
 class Monitor(Process):
     """docstring for Monitor"""
 
-    def __init__(self, project, rank=consts.RANKS["NOT_CRITICAL"], tick_handles = None, **kwargs):
-        super(Process, self).__init__(project = project, collection_name = "Monitors", rank = rank, *args, **kwargs)
-        self.tick_handles = tick_handles
-    
-   def recieve_tick_notification(self, process, tick_handle) :
-    if tick_handle in self.tick_handles :
-        self.tick_run(process, tick_handle)
+    def __init__(self, project, tick_input, rank=consts.RANKS["NOT_CRITICAL"]):
+        assert isinstance(tick_input, ProcessPlaceholderTick)
 
-    def _tick_run(self, process, tick_handle) :
+        super(Process, self).__init__(project = project, collection_name = "Monitors")
+        self.tick_input = tick_input
+    
+   def recieve_tick_notification(self, value, tick_field) :
+    if tick_field == self.tick_input.field :
+        self._tick_run(value)
+
+    def _tick_run(self) :
         import time
 
         self.update_status(consts.STATUS["RUNNING"])
@@ -379,7 +401,7 @@ class Monitor(Process):
         }
 
         try:
-            self.tick_run(process, tick_handle)
+            self.tick_run(self.tick_handle())
         except Exception as e:
             tick_dct["status"] = consts.STATUS["ERROR"]
         else :
@@ -390,14 +412,15 @@ class Monitor(Process):
         self.arango_doc["ticks"].append(tick)
         self.arango_doc.patch
 
-    def tick_run(self) :
+    def tick_run(self, input_value) :
         raise NotImplementedError("Must be implemented in child")
 
     def run(self) :
-        pass
+        self.update_status(consts.STATUS["DONE"])
   
 class Result(MetaProcess):
     """A result is a process with (usually) low critical rank that takes care of fromating results, saving in the database or serializaing them to disk"""
     
     def __init__(self, project, rank = consts.RANKS["NOT_CRITICAL"], checkpoint=False, **kwargs):
         super(Result, self).__init__(project = project, rank = rank, collection_name = "Result", **kwargs)
+
