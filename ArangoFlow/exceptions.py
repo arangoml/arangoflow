@@ -20,3 +20,19 @@ class ArgumentError(Exception) :
             names.append(k)
 
         return """\n%s. Expected: %s""" % (self.message, ', '.join(names))
+
+class ArgumentError(Exception) :
+    def __init__(self, expected_arguments, got_argumets):
+        super(ArgumentError, self).__init__()
+        self.expected_arguments = expected_arguments
+        self.got_argumets = got_argumets
+
+    def __str__(self) :
+        msg = "Expected {nb_expected} arguments ({exp_arguments}), got {nb_got} ({got_args})".format(
+                nb_expected = len(self.expected_arguments),
+                exp_arguments = ', '.join(self.expected_arguments),
+                nb_got = len(self.got_argumets),
+                got_args = ', '.join(self.got_argumets)
+            )
+
+        return msg

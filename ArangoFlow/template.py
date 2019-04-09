@@ -171,16 +171,24 @@ class MetaProcess(Node):
         """Analyse the arguments passed to __init__ finds ancestors (other processes needed for the conputation) and parameters (anything else) """
         import inspect
         import hashlib
+        
 
         obj = super(MetaProcess, cls).__new__(cls)
         sig = inspect.signature(cls.__init__)
-        if len(sig.parameters) != (len(args) + len(kwargs) + 1) : # +1 for self
-            raise exceptions.ArgumentError("Expected %s arguments, got %s" % (len(sig.parameters), len(args) + len(kwargs) +1 ), sig.parameters )
+
+        # if len(sig.parameters) != (len(args) + len(kwargs) + 1) : # +1 for self
+            # raise exceptions.ArgumentError("Expected %s arguments, got %s" % (len(sig.parameters), len(args) + len(kwargs) +1 ), sig.parameters )
 
         parameters = {}
         ancestors = {}
-    
+        provided_args = set(["self"]) #one foe self
+
+        for k, v in sig.parameters.items() :
+            if v.default is not inspect.Parameter.empty :
+                provided_args.add(k)
+
         for k, v in kwargs.items() :
+            provided_args.add(k)
             if k not in ["project", "collection_name", "rank", "checkpoint"] :
                 if isinstance(v, Node) and k != "self" :
                     if isinstance(v, ProcessPlaceholderField) or isinstance(v, ProcessPlaceholderTick) :
@@ -196,6 +204,7 @@ class MetaProcess(Node):
         frame_args = inspect.getargvalues(frame).locals["args"]
         if len(frame_args) > 0 :
             for i, kv in enumerate(sig.parameters.items()) :
+                provided_args.add(kv[0])
                 if i > 0 : #skip self argument
                     j = i-1
                     if kv[0] in kwargs :
@@ -210,6 +219,10 @@ class MetaProcess(Node):
                             frame_args[j].register_descendant(obj)
                     elif not isinstance(frame_args[j], FlowProject) :
                         parameters[kv[0]] = frame_args[j]
+
+        if len(sig.parameters) != len(provided_args) :
+            raise exceptions.ArgumentError(list(sig.parameters.keys()), list(provided_args))
+
 
         obj.parameters = parameters
         obj.ancestors = ancestors
@@ -272,6 +285,12 @@ class MetaProcess(Node):
             return True
 
         self.arango_doc = self.project.database[self.collection_name].createDocument()
+    
+        if not self.__class__.__doc__ :
+           doc = ""
+        else :
+           doc = inspect.cleandoc(self.__class__.__doc__)
+
         self.arango_doc.set(
             {
                 "start_date" : None,
@@ -283,7 +302,7 @@ class MetaProcess(Node):
                 "checkpoint": self.checkpoint,
                 "uuid": self.uuid,
                 "path_uuid": self.path_uuid,
-                "description" : inspect.cleandoc(self.__class__.__doc__)
+                "description" : doc
             }
         )
         self.arango_doc.save()
@@ -372,12 +391,12 @@ class Process(MetaProcess):
     def __init__(self, project, **kwargs):
         super(Process, self).__init__(project = project, collection_name = "Processes", **kwargs)
 
-class Monitor(Process):
+class Monitor(MetaProcess):
     """docstring for Monitor"""
 
-    def __init__(self, project, tick_input, rank=consts.RANKS["NOT_CRITICAL"]):
-        assert isinstance(tick_input, ProcessPlaceholderTick)
-        super(Monitor, self).__init__(project = project, collection_name = "Monitors", rank=rank, checkpoint = False)
+    def __init__(self, project, tick_input, rank=consts.RANKS["NOT_CRITICAL"], checkpoint = False):
+        super(Monitor, self).__init__(project = project, collection_name = "Monitors", rank=rank, checkpoint = checkpoint)
+        # assert isinstance(tick_input, ProcessPlaceholderTick)
         self.tick_input = tick_input
     
     def recieve_tick_notification(self, value, tick_field) :
@@ -420,5 +439,5 @@ class Result(MetaProcess):
     """A result is a process with (usually) low critical rank that takes care of fromating results, saving in the database or serializaing them to disk"""
     
     def __init__(self, project, rank = consts.RANKS["NOT_CRITICAL"], checkpoint=False, **kwargs):
-        super(Result, self).__init__(project = project, rank = rank, collection_name = "Result", **kwargs)
+        super(Result, self).__init__(project = project, rank = rank, collection_name = "Result", checkpoint=checkpoint **kwargs)
 
