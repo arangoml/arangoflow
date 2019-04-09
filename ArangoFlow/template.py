@@ -155,13 +155,10 @@ class ProcessPlaceholderTick(Node):
         proc = super(ProcessPlaceholderTick, self).__getattribute__('process')
         return getattr(proc, k)
 
-    # def __call__() :
-    #     return self.value
-
 class MetaProcess(Node):
     """Processes are atomic routines that take an arbitrary number of inputs and return a single outputs
     All processes received as arguments to __init__ are considered ancestors. A process will not run until
-    all it's ancestors have successfully finished. All other arguments are considered parameteres and will
+    all it's ancestors have successfully finished. All other arguments are considered parameters and will
     be saved in the databse for future reference.
     To use ArangoFlow, users will have to create their own processes by inheriting from this class. The must
     at least define the run() function. The end results of a process are stored in self.result
@@ -172,12 +169,32 @@ class MetaProcess(Node):
         import inspect
         import hashlib
         
+        def parse_argument(obj, name, value, ancestors, parameters) :
+            if isinstance(value, Node) :
+                if isinstance(value, ProcessPlaceholderField) or isinstance(value, ProcessPlaceholderTick) :
+                    ancestors[value.process] = {"status": value.process.status, "argument_name": k, 'field': value.field}
+                    value.process.register_descendant(obj)
+                else :
+                    ancestors[value] = {"status": value.status, "argument_name": k, 'field': None}
+                    value.register_descendant(obj)
+            elif not isinstance(value, FlowProject) :
+                parameters[name] = value
+            return ancestors, parameters
+
+        def parse_arguments(obj, name, value, ancestors, parameters) :
+            from collections.abc import Iterable
+
+            if type(value) is dict :
+                for k, v in value.items() :
+                    parse_arguments(obj, "%s.%s" % (name, k), v, ancestors, parameters)
+            elif isinstance(type(value), Iterable) :
+                for i, v in enumerate(value) :
+                    parse_arguments(obj, "%s[%s]" % (name, i), v, ancestors, parameters)
+            else :
+                return parse_argument(obj, name, value, ancestors, parameters)
 
         obj = super(MetaProcess, cls).__new__(cls)
         sig = inspect.signature(cls.__init__)
-
-        # if len(sig.parameters) != (len(args) + len(kwargs) + 1) : # +1 for self
-            # raise exceptions.ArgumentError("Expected %s arguments, got %s" % (len(sig.parameters), len(args) + len(kwargs) +1 ), sig.parameters )
 
         parameters = {}
         ancestors = {}
@@ -189,36 +206,38 @@ class MetaProcess(Node):
 
         for k, v in kwargs.items() :
             provided_args.add(k)
-            if k not in ["project", "collection_name", "rank", "checkpoint"] :
-                if isinstance(v, Node) and k != "self" :
-                    if isinstance(v, ProcessPlaceholderField) or isinstance(v, ProcessPlaceholderTick) :
-                        ancestors[v.process] = {"status": v.process.status, "argument_name": k, 'field': v.field}
-                        v.process.register_descendant(obj)
-                    else :
-                        ancestors[v] = {"status": v.status, "argument_name": k, 'field': None}
-                        v.register_descendant(obj)
-                elif not isinstance(v, FlowProject) :
-                    parameters[k] = v
+            if k not in ["self", "project", "collection_name", "rank", "checkpoint"] :
+                ancestors, parameters = parse_arguments(obj, k, v, ancestors, parameters)
+                # if isinstance(v, Node) and k != "self" :
+                #     if isinstance(v, ProcessPlaceholderField) or isinstance(v, ProcessPlaceholderTick) :
+                #         ancestors[v.process] = {"status": v.process.status, "argument_name": k, 'field': v.field}
+                #         v.process.register_descendant(obj)
+                #     else :
+                #         ancestors[v] = {"status": v.status, "argument_name": k, 'field': None}
+                #         v.register_descendant(obj)
+                # elif not isinstance(v, FlowProject) :
+                #     parameters[k] = v
 
         frame = inspect.currentframe()
         frame_args = inspect.getargvalues(frame).locals["args"]
         if len(frame_args) > 0 :
             for i, kv in enumerate(sig.parameters.items()) :
                 provided_args.add(kv[0])
+                if kv[0] in kwargs or kv[0] == "kwargs":
+                    break #args finished, entering into kwargs
                 if i > 0 : #skip self argument
                     j = i-1
-                    if kv[0] in kwargs :
-                        break #args finished, entering into kwargs
-                    
-                    if isinstance(frame_args[j], MetaProcess) :
-                        if isinstance(frame_args[j], ProcessPlaceholderField) or isinstance(frame_args[j], ProcessPlaceholderTick) :
-                            ancestors[frame_args[j].process] = {"status": frame_args[j].process.status, "argument_name": kv[0], "field": frame_args[j].field}
-                            frame_args[j].process.register_descendant(obj)
-                        else :
-                            ancestors[frame_args[j]] = {"status": frame_args[j].status, "argument_name": kv[0], "field": None}
-                            frame_args[j].register_descendant(obj)
-                    elif not isinstance(frame_args[j], FlowProject) :
-                        parameters[kv[0]] = frame_args[j]
+                    # print(kv[1].name)
+                    ancestors, parameters = parse_arguments(obj, kv[0], frame_args[j], ancestors, parameters)
+                    # if isinstance(frame_args[j], MetaProcess) :
+                    #     if isinstance(frame_args[j], ProcessPlaceholderField) or isinstance(frame_args[j], ProcessPlaceholderTick) :
+                    #         ancestors[frame_args[j].process] = {"status": frame_args[j].process.status, "argument_name": kv[0], "field": frame_args[j].field}
+                    #         frame_args[j].process.register_descendant(obj)
+                    #     else :
+                    #         ancestors[frame_args[j]] = {"status": frame_args[j].status, "argument_name": kv[0], "field": None}
+                    #         frame_args[j].register_descendant(obj)
+                    # elif not isinstance(frame_args[j], FlowProject) :
+                    #     parameters[kv[0]] = frame_args[j]
 
         if len(sig.parameters) != len(provided_args) :
             raise exceptions.ArgumentError(list(sig.parameters.keys()), list(provided_args))
@@ -322,7 +341,7 @@ class MetaProcess(Node):
     
     def tick(self, value, tick_field) :
         for d in self.monitors :
-            d.recieve_tick_notification(value, tick_field)
+            d.recieve_tick_notification(value, self, tick_field)
     
     def ticks(self, field) :
         return ProcessPlaceholderTick(self, field)
@@ -396,14 +415,23 @@ class Monitor(MetaProcess):
 
     def __init__(self, project, tick_input, rank=consts.RANKS["NOT_CRITICAL"]):
         super(Monitor, self).__init__(project = project, collection_name = "Monitors", rank=rank, checkpoint = False)
-        # assert isinstance(tick_input, ProcessPlaceholderTick)
-        self.tick_input = tick_input
-    
-    def recieve_tick_notification(self, value, tick_field) :
-        if tick_field == self.tick_input.field :
-            self._tick_run(value)
+        from collections.abc import Iterable
+        
+        self.tick_input = set()
+        if isinstance(tick_input, Iterable) :
+            for v in tick_input :
+                self.tick_input.add( (v.process.uuid, v.field) )
+        else :
+            try :
+                self.tick_input.add((tick_input.process.uuid, tick_input.field))
+            except :
+                raise ArgumentError("object %s is not a valid instance of Process" % tick_input)
 
-    def _tick_run(self, value) :
+    def recieve_tick_notification(self, value, process, tick_field) :
+        if (process.uuid, tick_field) in self.tick_input :
+            self._tick_run(process, value)
+
+    def _tick_run(self, process, value) :
         import time
 
         self.update_status(consts.STATUS["RUNNING"])
@@ -411,9 +439,9 @@ class Monitor(MetaProcess):
         tick_dct = {
             "start_date": time.time(),
             "end_date": None,
-            "process_id": self.tick_input.process.arango_doc["_id"],
-            "process_uuid": self.tick_input.process.arango_doc["uuid"],
-            "process_path_uuid": self.tick_input.process.arango_doc["path_uuid"],
+            "process_id": process.arango_doc["_id"],
+            "process_uuid": process.arango_doc["uuid"],
+            "process_path_uuid": process.arango_doc["path_uuid"],
             "status": consts.STATUS["RUNNING"]
         }
 
@@ -430,7 +458,7 @@ class Monitor(MetaProcess):
         self.arango_doc["ticks"] = self.arango_doc["ticks"]
         self.arango_doc.patch()
 
-    def tick_run(self, input_value) :
+    def tick_run(self, process, input_value) :
         raise NotImplementedError("Must be implemented in child")
 
     def run(self) :

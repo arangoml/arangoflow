@@ -18,7 +18,7 @@ class RandomMatrix(template.Process):
         return numpy.random.random(self.size)
 
 class Ticker(template.Monitor) :
-    """Simply regeisters ticks"""
+    """Simply registers ticks"""
     def tick_run(self, value) :
         print("Monitor Ticker received: ", value)
 
