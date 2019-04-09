@@ -394,8 +394,8 @@ class Process(MetaProcess):
 class Monitor(MetaProcess):
     """docstring for Monitor"""
 
-    def __init__(self, project, tick_input, rank=consts.RANKS["NOT_CRITICAL"], checkpoint = False):
-        super(Monitor, self).__init__(project = project, collection_name = "Monitors", rank=rank, checkpoint = checkpoint)
+    def __init__(self, project, tick_input, rank=consts.RANKS["NOT_CRITICAL"]):
+        super(Monitor, self).__init__(project = project, collection_name = "Monitors", rank=rank, checkpoint = False)
         # assert isinstance(tick_input, ProcessPlaceholderTick)
         self.tick_input = tick_input
     

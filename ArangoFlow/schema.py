@@ -39,7 +39,7 @@ class Processes(Collection) :
         "parameters" : {},
         "uuid": Field(validators = [VAL.NotNull()]),    
         "path_uuid": Field(validators = [VAL.NotNull()]),
-        "description": Field(validators = [VAL.NotNull()]),
+        "description": Field(default=""),
         "ticks": Field()
     }
 
@@ -61,7 +61,7 @@ class Monitors(Collection):
         "parameters" : {},
         "uuid": Field(validators = [VAL.NotNull()]),
         "path_uuid": Field(validators = [VAL.NotNull()]),
-        "description": Field(validators = [VAL.NotNull()]),
+        "description": Field(default=""),
         "ticks": Field()
     }
 
@@ -82,7 +82,7 @@ class Results(Collection):
         "parameters" : {},
         "uuid": Field(validators = [VAL.NotNull()]),
         "path_uuid": Field(validators = [VAL.NotNull()]),
-        "description": Field(validators = [VAL.NotNull()])
+        "description": Field(default="")
     }
 
         
@@ -100,5 +100,5 @@ class Pipes(Edges) :
 
 class ArangoFlow_graph(GR.Graph):
     _edgeDefinitions = (
-        GR.EdgeDefinition("Pipes", fromCollections = ["Processes"], toCollections = ["Processes", "Results"]),
+        GR.EdgeDefinition("Pipes", fromCollections = ["Processes", "Monitors", "Results"], toCollections = ["Processes", "Monitors", "Results"]),
     )
