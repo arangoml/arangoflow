@@ -40,7 +40,6 @@ class Processes(Collection) :
         "uuid": Field(validators = [VAL.NotNull()]),    
         "path_uuid": Field(validators = [VAL.NotNull()]),
         "description": Field(default=""),
-        "ticks": Field()
     }
 
 class Monitors(Collection):
@@ -62,7 +61,7 @@ class Monitors(Collection):
         "uuid": Field(validators = [VAL.NotNull()]),
         "path_uuid": Field(validators = [VAL.NotNull()]),
         "description": Field(default=""),
-        "ticks": Field()
+        "ticks": Field(default = [])
     }
 
 class Results(Collection):

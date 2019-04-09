@@ -246,7 +246,7 @@ class MetaProcess(Node):
         super(MetaProcess, self).__init__()
         
         self.collection_name = collection_name
-        self.rank = consts.RANKS["CRITICAL"]
+        self.rank = rank
         self.status = consts.STATUS["PENDING"]
         self.checkpoint = checkpoint
         
@@ -322,7 +322,7 @@ class MetaProcess(Node):
     
     def tick(self, value, tick_field) :
         for d in self.monitors :
-            d.recieve_tick_notification(self, value, tick_field)
+            d.recieve_tick_notification(value, tick_field)
     
     def ticks(self, field) :
         return ProcessPlaceholderTick(self, field)
@@ -403,7 +403,7 @@ class Monitor(MetaProcess):
         if tick_field == self.tick_input.field :
             self._tick_run(value)
 
-    def _tick_run(self) :
+    def _tick_run(self, value) :
         import time
 
         self.update_status(consts.STATUS["RUNNING"])
@@ -411,14 +411,14 @@ class Monitor(MetaProcess):
         tick_dct = {
             "start_date": time.time(),
             "end_date": None,
-            "process_id": process.arango_doc["_id"],
-            "process_uuid": process.arango_doc["uuid"],
-            "process_path_uuid": process.arango_doc["path_uuid"],
+            "process_id": self.tick_input.process.arango_doc["_id"],
+            "process_uuid": self.tick_input.process.arango_doc["uuid"],
+            "process_path_uuid": self.tick_input.process.arango_doc["path_uuid"],
             "status": consts.STATUS["RUNNING"]
         }
 
         try:
-            self.tick_run(self.tick_handle())
+            self.tick_run(value)
         except Exception as e:
             tick_dct["status"] = consts.STATUS["ERROR"]
         else :
@@ -426,8 +426,9 @@ class Monitor(MetaProcess):
         
         tick_dct["end_date"] = time.time()
         self.update_status(consts.STATUS["PENDING"])
-        self.arango_doc["ticks"].append(tick)
-        self.arango_doc.patch
+        self.arango_doc["ticks"].append(tick_dct)
+        self.arango_doc["ticks"] = self.arango_doc["ticks"]
+        self.arango_doc.patch()
 
     def tick_run(self, input_value) :
         raise NotImplementedError("Must be implemented in child")
