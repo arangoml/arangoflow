@@ -413,7 +413,7 @@ class Process(MetaProcess):
 class Monitor(MetaProcess):
     """docstring for Monitor"""
 
-    def __init__(self, project, tick_input, rank=consts.RANKS["NOT_CRITICAL"]):
+    def __init__(self, project, tick_input, rank=consts.RANKS["CRITICAL"]):
         super(Monitor, self).__init__(project = project, collection_name = "Monitors", rank=rank, checkpoint = False)
         from collections.abc import Iterable
         
@@ -439,6 +439,7 @@ class Monitor(MetaProcess):
         tick_dct = {
             "start_date": time.time(),
             "end_date": None,
+            "process_name": process.name,
             "process_id": process.arango_doc["_id"],
             "process_uuid": process.arango_doc["uuid"],
             "process_path_uuid": process.arango_doc["path_uuid"],
@@ -446,9 +447,11 @@ class Monitor(MetaProcess):
         }
 
         try:
-            self.tick_run(value)
+            self.tick_run(process, value)
         except Exception as e:
+            # print(e.message)
             tick_dct["status"] = consts.STATUS["ERROR"]
+            self.project.notify_error(self)
         else :
             tick_dct["status"] = consts.STATUS["DONE"]
         

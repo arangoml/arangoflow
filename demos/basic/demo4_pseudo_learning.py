@@ -39,7 +39,7 @@ class PseudoCurve(template.Monitor) :
     """"""
     def __init__(self, project, tick_input, **kwargs):
         super(PseudoCurve, self).__init__(project, tick_input, **kwargs)
-        self.data = data
+        self.data = []
         
     def tick_run(self, process, value) :
         self.data.append(value)
