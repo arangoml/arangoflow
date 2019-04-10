@@ -82,12 +82,12 @@ class FlowProject(object):
                 inp._db_create()
                 for desc in inp.descendants :
                     desc._db_create()
-                    self.database.graphs["ArangoFlow_graph"].link("Pipes", inp.arango_doc._id, desc.arango_doc._id, {"field": desc.ancestors[inp]["field"] } )
+                    self.database.graphs["ArangoFlow_graph"].link("Pipes", inp.arango_doc._id, desc.arango_doc._id, {"field": desc.ancestors[inp]["field"], "_to_name": inp.name, "_from_name": desc.name } )
                     self._build_traverse(desc)
         else :
             for desc in start_node.descendants :
                 desc._db_create()
-                e = self.database.graphs["ArangoFlow_graph"].link("Pipes", start_node.arango_doc, desc.arango_doc, {"field": desc.ancestors[start_node]["field"] })
+                e = self.database.graphs["ArangoFlow_graph"].link("Pipes", start_node.arango_doc, desc.arango_doc, {"field": desc.ancestors[start_node]["field"], "_to_name": start_node.name, "_from_name": desc.name })
                 self._build_traverse(desc)
 
     def run(self):
@@ -179,19 +179,18 @@ class MetaProcess(Node):
                     value.register_descendant(obj)
             elif not isinstance(value, FlowProject) :
                 parameters[name] = value
-            return ancestors, parameters
-
+            
         def parse_arguments(obj, name, value, ancestors, parameters) :
             from collections.abc import Iterable
 
             if type(value) is dict :
                 for k, v in value.items() :
                     parse_arguments(obj, "%s.%s" % (name, k), v, ancestors, parameters)
-            elif isinstance(type(value), Iterable) :
+            elif isinstance(value, Iterable) :
                 for i, v in enumerate(value) :
                     parse_arguments(obj, "%s[%s]" % (name, i), v, ancestors, parameters)
             else :
-                return parse_argument(obj, name, value, ancestors, parameters)
+                parse_argument(obj, name, value, ancestors, parameters)
 
         obj = super(MetaProcess, cls).__new__(cls)
         sig = inspect.signature(cls.__init__)
@@ -207,7 +206,7 @@ class MetaProcess(Node):
         for k, v in kwargs.items() :
             provided_args.add(k)
             if k not in ["self", "project", "collection_name", "rank", "checkpoint"] :
-                ancestors, parameters = parse_arguments(obj, k, v, ancestors, parameters)
+                parse_arguments(obj, k, v, ancestors, parameters)
                 # if isinstance(v, Node) and k != "self" :
                 #     if isinstance(v, ProcessPlaceholderField) or isinstance(v, ProcessPlaceholderTick) :
                 #         ancestors[v.process] = {"status": v.process.status, "argument_name": k, 'field': v.field}
@@ -228,7 +227,7 @@ class MetaProcess(Node):
                 if i > 0 : #skip self argument
                     j = i-1
                     # print(kv[1].name)
-                    ancestors, parameters = parse_arguments(obj, kv[0], frame_args[j], ancestors, parameters)
+                    parse_arguments(obj, kv[0], frame_args[j], ancestors, parameters)
                     # if isinstance(frame_args[j], MetaProcess) :
                     #     if isinstance(frame_args[j], ProcessPlaceholderField) or isinstance(frame_args[j], ProcessPlaceholderTick) :
                     #         ancestors[frame_args[j].process] = {"status": frame_args[j].process.status, "argument_name": kv[0], "field": frame_args[j].field}
@@ -339,7 +338,8 @@ class MetaProcess(Node):
         for d in self.descendants :
             d.recieve_ancestor_join(self)
     
-    def tick(self, value, tick_field) :
+    def tick(self, tick_field, value) :
+        assert type(tick_field) is str
         for d in self.monitors :
             d.recieve_tick_notification(value, self, tick_field)
     

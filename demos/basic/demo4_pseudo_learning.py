@@ -25,7 +25,7 @@ class PseudoLearner(template.Process):
 
     def run(self) :
         import random
-        for i in range(1000) :
+        for i in range(10) :
             acc = {
                     "train": random.random() * 100,
                     "test": random.random() * 100,

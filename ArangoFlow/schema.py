@@ -94,7 +94,9 @@ class Pipes(Edges) :
     }
 
     _fields = {
-        "field": Field()
+        "field": Field(),
+        "_to_name": Field(validators = [VAL.NotNull()]),
+        "_from_name": Field(validators = [VAL.NotNull()]),
     }
 
 class ArangoFlow_graph(GR.Graph):
