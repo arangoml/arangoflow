@@ -172,10 +172,10 @@ class MetaProcess(Node):
         def parse_argument(obj, name, value, ancestors, parameters) :
             if isinstance(value, Node) :
                 if isinstance(value, ProcessPlaceholderField) or isinstance(value, ProcessPlaceholderTick) :
-                    ancestors[value.process] = {"status": value.process.status, "argument_name": k, 'field': value.field}
+                    ancestors[value.process] = {"status": value.process.status, "argument_name": name, 'field': value.field}
                     value.process.register_descendant(obj)
                 else :
-                    ancestors[value] = {"status": value.status, "argument_name": k, 'field': None}
+                    ancestors[value] = {"status": value.status, "argument_name": name, 'field': None}
                     value.register_descendant(obj)
             elif not isinstance(value, FlowProject) :
                 parameters[name] = value
@@ -226,7 +226,7 @@ class MetaProcess(Node):
                     break #args finished, entering into kwargs
                 if i > 0 : #skip self argument
                     j = i-1
-                    # print(kv[1].name)
+                    # print(kv[1].name, frame_args[j])
                     parse_arguments(obj, kv[0], frame_args[j], ancestors, parameters)
                     # if isinstance(frame_args[j], MetaProcess) :
                     #     if isinstance(frame_args[j], ProcessPlaceholderField) or isinstance(frame_args[j], ProcessPlaceholderTick) :

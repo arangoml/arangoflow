@@ -40,10 +40,10 @@ class PseudoCurve(template.Monitor) :
     def __init__(self, project, tick_input, **kwargs):
         super(PseudoCurve, self).__init__(project, tick_input, **kwargs)
         self.data = []
+        print(self.ancestors)
         
     def tick_run(self, process, value) :
         self.data.append(value)
-
     def run(self) :
         print(self.data)
         return self.data
@@ -94,6 +94,7 @@ if __name__ == '__main__':
             learners.append(model)
             tick_handles.append(model.ticks("accuracy"))
 
+        print(learners)
         curves = PseudoCurve(project, tick_handles)
         sel = PseudoSelector(project, learners)
         project.run()
