@@ -172,10 +172,10 @@ class MetaProcess(Node):
         def parse_argument(obj, name, value, ancestors, parameters) :
             if isinstance(value, Node) :
                 if isinstance(value, ProcessPlaceholderField) or isinstance(value, ProcessPlaceholderTick) :
-                    ancestors[value.process] = {"status": value.process.status, "argument_name": name, 'field': value.field}
+                    ancestors[value.process] = {"status": value.process.status, 'field': value.field, "uuid": value.process.uuid}
                     value.process.register_descendant(obj)
                 else :
-                    ancestors[value] = {"status": value.status, "argument_name": name, 'field': None}
+                    ancestors[value] = {"status": value.status, 'field': None, "uuid": value.uuid}
                     value.register_descendant(obj)
             elif not isinstance(value, FlowProject) :
                 parameters[name] = value
@@ -348,14 +348,18 @@ class MetaProcess(Node):
 
     def recieve_ancestor_join(self, process) :
         """receive an end of run notification from an ancestor. If process has at least one of it's ancestors termiate with a error, it will raise a RuntimeError"""
+        if (self.status == consts.STATUS["DONE"]) :
+            return
+
         self.ancestors[process]["status"] = process.status
-        self.ancestors_finished.add(self.ancestors[process]["argument_name"])
+        self.ancestors_finished.add(self.ancestors[process]["uuid"])
         
         if process.status == consts.STATUS["DONE"] :
-            self.ancestors_ready.add(self.ancestors[process]["argument_name"])
+            self.ancestors_ready.add(self.ancestors[process]["uuid"])
         
-        if len(self.ancestors_ready) == len(self.ancestors) :
-            self._run()
+        if (len(self.ancestors_ready) == len(self.ancestors)) :
+            print(self, process, self.ancestors_ready, self.ancestors)
+        
         elif len(self.ancestors_finished) == len(self.ancestors) :
             raise RuntimeError("Process upward of self finished with errors: %s" % (self.ancestors_finished - self.ancestors_ready) )
 

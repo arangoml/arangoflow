@@ -31,7 +31,7 @@ class PseudoLearner(template.Process):
                     "test": random.random() * 100,
                     "validation": random.random() * 100,
                 }
-            self.tick("accuracy", acc)
+            self.tick("accuracy", i)
 
         return acc
 
@@ -40,12 +40,13 @@ class PseudoCurve(template.Monitor) :
     def __init__(self, project, tick_input, **kwargs):
         super(PseudoCurve, self).__init__(project, tick_input, **kwargs)
         self.data = []
-        print(self.ancestors)
         
     def tick_run(self, process, value) :
         self.data.append(value)
+    
     def run(self) :
-        print(self.data)
+        # print(self.ancestors)
+        # print(self.data)
         return self.data
 
 class PseudoSelector(template.Process):
@@ -94,7 +95,7 @@ if __name__ == '__main__':
             learners.append(model)
             tick_handles.append(model.ticks("accuracy"))
 
-        print(learners)
+        # print(learners)
         curves = PseudoCurve(project, tick_handles)
         sel = PseudoSelector(project, learners)
         project.run()
